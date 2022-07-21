@@ -6,7 +6,7 @@
   <link href="http://example.com/atom.xml" rel="self"/>
   
   <link href="http://example.com/"/>
-  <updated>2021-01-16T05:19:40.180Z</updated>
+  <updated>2022-07-21T03:30:14.247Z</updated>
   <id>http://example.com/</id>
   
   <author>
@@ -15,6 +15,27 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>fofa API 签名逆向</title>
+    <link href="http://example.com/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/"/>
+    <id>http://example.com/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/</id>
+    <published>2021-07-21T02:50:00.000Z</published>
+    <updated>2022-07-21T03:30:14.247Z</updated>
+    
+    <content type="html"><![CDATA[<p>某天准备用自己抓包写的脚本爬一些fofa上的数据时，发现出错了</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  &quot;code&quot;: -9,</span><br><span class="line">  &quot;message&quot;: &quot;[-9] API校验密匙错&quot;,</span><br><span class="line">  &quot;data&quot;: &quot;&quot;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>经过抓包，发现请求多了<code>ts</code>  <code>sign</code>  <code>app_id</code> 三个参数，关键是<code>sign</code></p><p><img src="/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/image-20220509220709783.png"><br> <span id="more"></span></p><p>尝试通过追踪请求的调用栈和搜索关键词，在webpack js源码中找到签名的代码</p><p><img src="/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/image-20220509221214758.png"></p><p>发现这里有一串RSA private key，调用sortFun进行签名</p><p>找到sortFun</p><p><img src="/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/image-20220509221521260.png"> </p><p>对代码进行修改以方便调试和查看效果</p><p><img src="/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/image-20220509221650316.png"> </p><p><img src="/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/image-20220509221843541.png"> </p><p><img src="/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/image-20220509221937552.png"></p><p>可以看到签名的字符串是把url中的所有参数和值拼接在一起</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> -n <span class="string">&quot;fullfalseqbase64cHJvdG9jb2w9Imh0dHAits1652105964318&quot;</span> | openssl dgst -sha256 -sign fofa_rsa.pem | <span class="built_in">base64</span></span><br><span class="line">X2gz9o3GrWhKim51dO5QB0nz2XJLCCP5T9jJxn3TXZH7NLNy75enVvb8JMoIbCJuEuoM1HdI6nd2</span><br><span class="line">YdGn7Ag26lnZoUNQy/4l+0ff66mvaxl+iidthKV/MaINvFSewlteGCzwekx0IbiOS4HABmOBCfqG</span><br><span class="line">2HzAb+Eqo/olWoDcNmJSaW9f4f1W0bpQNoB9XCHL5Jsq89AwG/5hrbdKXCZu93f9sFdHszw7kZGQ</span><br><span class="line">kqBgPm/SJ7hJnukCMWBB6GF7eotOGx524RMGO/LKiDBb9g3dUNGa4H1op6AW5WpaeRQT2CPTpjLk</span><br><span class="line">qVZYaG7bO6t2zO3ltcg6ajTIplVfgtIbu/ZvqQ==</span><br></pre></td></tr></table></figure><p>验证成功</p><p>py脚本</p><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">qbase64 = base64.b64encode(q.encode()).decode()</span><br><span class="line">for_sign = <span class="string">&quot;fullfalsepage%sq%sqbase64%ssize10&quot;</span>%(i,q,qbase64)</span><br><span class="line">sign = urllib.parse.quote(base64.b64encode(rsa.sign_hash(rsa.compute_hash(for_sign.encode(), <span class="string">&#x27;SHA-256&#x27;</span>), privkey, <span class="string">&#x27;SHA-256&#x27;</span>)).decode(),safe=<span class="string">&quot;&quot;</span>)</span><br></pre></td></tr></table></figure>]]></content>
+    
+    
+    <summary type="html">&lt;p&gt;某天准备用自己抓包写的脚本爬一些fofa上的数据时，发现出错了&lt;/p&gt;
+&lt;figure class=&quot;highlight plaintext&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;span class=&quot;line&quot;&gt;1&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;2&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;3&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;4&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;5&lt;/span&gt;&lt;br&gt;&lt;/pre&gt;&lt;/td&gt;&lt;td class=&quot;code&quot;&gt;&lt;pre&gt;&lt;span class=&quot;line&quot;&gt;&amp;#123;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;  &amp;quot;code&amp;quot;: -9,&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;  &amp;quot;message&amp;quot;: &amp;quot;[-9] API校验密匙错&amp;quot;,&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;  &amp;quot;data&amp;quot;: &amp;quot;&amp;quot;&lt;/span&gt;&lt;br&gt;&lt;span class=&quot;line&quot;&gt;&amp;#125;&lt;/span&gt;&lt;br&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/figure&gt;
+
+&lt;p&gt;经过抓包，发现请求多了&lt;code&gt;ts&lt;/code&gt;  &lt;code&gt;sign&lt;/code&gt;  &lt;code&gt;app_id&lt;/code&gt; 三个参数，关键是&lt;code&gt;sign&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;/2021/07/21/fofa-API-%E7%AD%BE%E5%90%8D%E9%80%86%E5%90%91/image-20220509220709783.png&quot;&gt;&lt;br&gt;</summary>
+    
+    
+    
+    
+  </entry>
   
   <entry>
     <title>syscall&amp;ret2syscall学习笔记</title>
